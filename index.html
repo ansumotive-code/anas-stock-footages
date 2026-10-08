@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Anas Stock Footages</title>
 <style>
   :root{--bg:#0b0b12;--card:#14141f;--card2:#0f0f19;--line:#26263a;--txt:#e8e8f2;--mut:#8a8aa6;--acc:#6c63ff;--acc2:#8b5cf6;--ok:#22c58b;--bad:#ff6b6b;--warn:#f5b84b}
@@ -55,7 +56,6 @@
   .pill.bad{border-color:#4a2222;background:#271010;color:var(--bad)}
   .chk{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--mut)}
   .chk input{accent-color:var(--acc)}
-  #cv{display:none;width:100%;margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#000}
   .res{margin-top:12px;padding:12px;border:1px solid #1c4636;background:#10261f;border-radius:10px;font-size:13px}
   .res small{color:var(--mut)}
   .res button{margin-top:10px}
@@ -71,17 +71,15 @@
     <div class="brand"><h1>Anas <span>Stock Footages</span></h1></div>
 
     <div class="pills">
-      <span class="pill" id="pillPex">Pexels: check ho raha...</span>
       <span class="pill" id="pillPix">Pixabay: check ho raha...</span>
     </div>
-    <details id="keys">
-      <summary>🔑 API Keys (sirf ek baar, browser me save hoti hain)</summary>
-      <label>Pexels API key</label>
-      <input type="password" id="kPex" autocomplete="off" placeholder="Pexels key">
+
+    <details id="keys" open>
+      <summary>🔑 Pixabay API Key (browser me save hoti hai)</summary>
       <label>Pixabay API key</label>
       <input type="password" id="kPix" autocomplete="off" placeholder="Pixabay key">
-      <button id="saveKeys" style="margin-top:10px">Save &amp; Test keys</button>
-      <div class="keylink">Free keys: <a href="https://www.pexels.com/api/" target="_blank" rel="noopener">pexels.com/api</a> · <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a></div>
+      <button id="saveKeys" style="margin-top:10px">Save &amp; Test key</button>
+      <div class="keylink">Free key: <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a></div>
     </details>
 
     <label>Project name</label>
@@ -92,14 +90,6 @@
 
     <div class="two">
       <div>
-        <label>Source</label>
-        <select id="source">
-          <option value="both">Pexels + Pixabay</option>
-          <option value="pexels">Sirf Pexels</option>
-          <option value="pixabay">Sirf Pixabay</option>
-        </select>
-      </div>
-      <div>
         <label>Orientation</label>
         <select id="orient">
           <option value="">Any</option>
@@ -107,15 +97,16 @@
           <option value="portrait">Portrait (Shorts)</option>
         </select>
       </div>
+      <div>
+        <label>Quality</label>
+        <select id="quality">
+          <option value="2160">4K</option>
+          <option value="1080">1080p</option>
+          <option value="720" selected>720p</option>
+          <option value="480">480p</option>
+        </select>
+      </div>
     </div>
-
-    <label>Quality</label>
-    <select id="quality">
-      <option value="2160">4K (agar available ho)</option>
-      <option value="1080" selected>1080p (Full HD)</option>
-      <option value="720">720p (HD)</option>
-      <option value="480">480p (SD)</option>
-    </select>
 
     <label>Output</label>
     <select id="outMode">
@@ -142,9 +133,7 @@
     <div class="bar" id="bar"><i id="barI"></i></div>
     <div class="stat" id="stat"></div>
 
-    <canvas id="cv"></canvas>
     <div id="result"></div>
-
     <div id="log"></div>
   </div>
 
@@ -165,20 +154,18 @@
 </div>
 
 <footer>
-  Videos <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a> aur
-  <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> ke hain.
-  Merge WebCodecs (frame-by-frame) se hota hai — tab background me bhi chalta rehta hai.
-  Final video me audio nahi hoti.
+  Videos <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> ke hain, unke free license ke tahat.
+  Merge WebCodecs (frame-by-frame) se hota hai — tab background me bhi chalta rehta hai. Final video me audio nahi hoti.
 </footer>
 
 <script type="module">
 /* =========================================================
-   Anas Stock Footages — WebCodecs (background-safe) + Fast
+   Anas Stock Footages — Pixabay only + WebCodecs (bg-safe)
    ========================================================= */
 
 import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@5/+esm';
 
-const DEFAULT_KEYS = { pexels: '', pixabay: '' };
+const DEFAULT_KEYS = { pixabay: '' };  // ← yahan apni Pixabay key paste kar sakte ho
 
 const $ = id => document.getElementById(id);
 const store = {
@@ -194,38 +181,27 @@ const HAS_CODECS = typeof window.VideoEncoder !== 'undefined' && typeof window.V
 $('sMode').textContent = HAS_CODECS ? 'WebCodecs' : 'Clips only';
 
 /* ---------- keys ---------- */
-const getKey = n => n==='pex' ? (store.get('pexKey') || DEFAULT_KEYS.pexels) : (store.get('pixKey') || DEFAULT_KEYS.pixabay);
-$('kPex').value = getKey('pex');
-$('kPix').value = getKey('pix');
+const getKey = () => store.get('pixKey') || DEFAULT_KEYS.pixabay;
+$('kPix').value = getKey();
+
 function setPill(id, ok, text){ const p=$(id); p.className='pill '+(ok===true?'ok':ok===false?'bad':''); p.textContent=text; }
 function refreshPills(){
-  setPill('pillPex', getKey('pex')?true:false, getKey('pex')?'✅ Pexels key saved':'⚠ Pexels key chahiye');
-  setPill('pillPix', getKey('pix')?true:false, getKey('pix')?'✅ Pixabay key saved':'⚠ Pixabay key chahiye');
+  setPill('pillPix', getKey()?true:false, getKey()?'✅ Pixabay key saved':'⚠ Pixabay key chahiye');
 }
-async function testKeys(){
-  if(getKey('pex')){
-    try{
-      const r = await fetch('https://api.pexels.com/videos/search?query=nature&per_page=1',{headers:{Authorization:getKey('pex')}});
-      if(r.ok) setPill('pillPex',true,'🟢 Pexels connected');
-      else setPill('pillPex',false,'❌ Pexels key galat ('+r.status+')');
-    }catch(e){ setPill('pillPex',false,'❌ Pexels connect nahi hua'); }
-  }
-  if(getKey('pix')){
-    try{
-      const r = await fetch('https://pixabay.com/api/videos/?key='+encodeURIComponent(getKey('pix'))+'&q=nature&per_page=3');
-      if(r.ok) setPill('pillPix',true,'🟢 Pixabay connected');
-      else setPill('pillPix',false,'❌ Pixabay key galat ('+r.status+')');
-    }catch(e){ setPill('pillPix',false,'❌ Pixabay connect nahi hua'); }
-  }
+async function testKey(){
+  if(!getKey()) return;
+  try{
+    const r = await fetch('https://pixabay.com/api/videos/?key='+encodeURIComponent(getKey())+'&q=nature&per_page=3');
+    if(r.ok) setPill('pillPix',true,'🟢 Pixabay connected');
+    else setPill('pillPix',false,'❌ Pixabay key galat ('+r.status+')');
+  }catch(e){ setPill('pillPix',false,'❌ Pixabay connect nahi hua'); }
 }
 $('saveKeys').onclick = () => {
-  store.set('pexKey', $('kPex').value.trim());
   store.set('pixKey', $('kPix').value.trim());
-  log('API keys save ho gayi. Test ho raha hai...');
-  refreshPills(); testKeys();
+  log('Pixabay key save ho gayi. Test ho raha hai...');
+  refreshPills(); testKey();
 };
-$('pillPex').onclick = $('pillPix').onclick = () => { $('keys').open = true; };
-if(!getKey('pex') || !getKey('pix')) $('keys').open = true;
+$('pillPix').onclick = () => { $('keys').open = true; };
 
 /* ---------- sliders / estimate ---------- */
 function upd(){
@@ -272,41 +248,29 @@ $('clearH').onclick = () => {
 };
 saveHist(); renderHist();
 
-/* ---------- API ---------- */
+/* ---------- Pixabay API ---------- */
 function pickFile(files, q){
   const ok = files.filter(f=>f.k<=q);
   if(ok.length) return ok.sort((a,b)=>b.k-a.k)[0];
   return files.slice().sort((a,b)=>a.k-b.k)[0];
 }
-async function pexelsPage(kw, page, orient, maxClip, q){
-  const u = new URL('https://api.pexels.com/videos/search');
-  u.searchParams.set('query', kw); u.searchParams.set('per_page', 80); u.searchParams.set('page', page);
-  if(orient) u.searchParams.set('orientation', orient);
-  const r = await fetch(u, {headers:{Authorization:getKey('pex')}});
-  if(r.status===429){ const e = new Error('Pexels rate limit'); e.rate = true; throw e; }
-  if(!r.ok) throw new Error('Pexels error '+r.status);
-  const d = await r.json();
-  const out = [];
-  for(const v of d.videos||[]){
-    if(!v.duration || v.duration>maxClip || v.duration<3) continue;
-    const files = (v.video_files||[]).filter(f=>f.file_type==='video/mp4' && f.width && f.height && f.link)
-      .map(f=>({url:f.link,w:f.width,h:f.height,k:Math.min(f.width,f.height)}));
-    if(!files.length) continue;
-    out.push({id:'px'+v.id, dur:v.duration, file:pickFile(files,q)});
-  }
-  return {items:out, more: !!d.next_page};
-}
 async function pixabayPage(kw, page, orient, maxClip, q){
   const u = new URL('https://pixabay.com/api/videos/');
-  u.searchParams.set('key', getKey('pix')); u.searchParams.set('q', kw); u.searchParams.set('per_page', 100); u.searchParams.set('page', page);
+  u.searchParams.set('key', getKey());
+  u.searchParams.set('q', kw);
+  u.searchParams.set('per_page', 100);
+  u.searchParams.set('page', page);
   const r = await fetch(u);
   if(r.status===429){ const e = new Error('Pixabay rate limit'); e.rate = true; throw e; }
+  if(r.status===401){ const e = new Error('Pixabay key galat (401)'); e.rate = false; throw e; }
   if(!r.ok) throw new Error('Pixabay error '+r.status);
   const d = await r.json();
   const out = [];
   for(const h of d.hits||[]){
     if(!h.duration || h.duration>maxClip || h.duration<3) continue;
-    const files = ['large','medium','small','tiny'].map(k=>h.videos&&h.videos[k]).filter(f=>f&&f.url&&f.width&&f.height)
+    const files = ['large','medium','small','tiny']
+      .map(k=>h.videos&&h.videos[k])
+      .filter(f=>f&&f.url&&f.width&&f.height)
       .map(f=>({url:f.url,w:f.width,h:f.height,k:Math.min(f.width,f.height)}));
     if(!files.length) continue;
     const best = files.slice().sort((a,b)=>b.k-a.k)[0];
@@ -318,17 +282,16 @@ async function pixabayPage(kw, page, orient, maxClip, q){
 }
 
 /* ---------- FAST gather: parallel pages ---------- */
-async function gather(kw, src, orient, targetSec, maxClip, q){
+async function gather(kw, orient, targetSec, maxClip, q){
   const seen = new Set(), clips = []; let sum = 0;
   const noRep = $('noRepeat').checked;
   const MAX_PAGE = 10;
   const tasks = [];
   for(let p=1; p<=MAX_PAGE; p++){
-    if(src!=='pixabay') tasks.push(
-      pexelsPage(kw,p,orient,maxClip,q).then(r=>({page:p, items:r.items})).catch(e=>({page:p, items:[], err:e.message}))
-    );
-    if(src!=='pexels') tasks.push(
-      pixabayPage(kw,p,orient,maxClip,q).then(r=>({page:p, items:r.items})).catch(e=>({page:p, items:[], err:e.message}))
+    tasks.push(
+      pixabayPage(kw,p,orient,maxClip,q)
+        .then(r=>({page:p, items:r.items, more:r.more}))
+        .catch(e=>({page:p, items:[], err:e.message}))
     );
   }
   log(`Parallel search: ${tasks.length} requests...`);
@@ -392,7 +355,7 @@ class CodecsMerger {
       width: W, height: H,
       bitrate: bps,
       framerate: fps,
-      latencyMode: 'realtime'   // ✅ FAST
+      latencyMode: 'realtime'
     });
     this.timestamp = 0;
     this.frameDur = Math.round(1e6 / fps);
@@ -416,25 +379,21 @@ class CodecsMerger {
       const s = cover ? Math.max(this.W/vw, this.H/vh) : Math.min(this.W/vw, this.H/vh);
       const dw = vw*s, dh = vh*s;
       const dx = (this.W-dw)/2, dy = (this.H-dh)/2;
-
       const dur = Math.min(v.duration || 0, targetDur || v.duration || 0);
 
       if('requestVideoFrameCallback' in v){
-        await new Promise((res, rej)=>{
+        await new Promise((res)=>{
           let stopped = false;
           const cleanup = ()=>{ stopped = true; try{ v.pause(); }catch(e){} };
           v.onended = ()=>res();
-
           const onFrame = () => {
             if(stopped) return;
             if(state.stop){ cleanup(); return res(); }
             if(state.paused){ setTimeout(()=>v.requestVideoFrameCallback(onFrame), 200); return; }
             if(v.currentTime > dur){ cleanup(); return res(); }
-
             this.ctx.fillStyle = '#000';
             this.ctx.fillRect(0,0,this.W,this.H);
             this.ctx.drawImage(v, dx, dy, dw, dh);
-
             try{
               const frame = new VideoFrame(this.canvas, { timestamp: this.timestamp });
               const keyFrame = (this.encoded % (this.fps*2) === 0);
@@ -443,11 +402,10 @@ class CodecsMerger {
               this.timestamp += this.frameDur;
               this.encoded++;
             }catch(e){}
-
             v.requestVideoFrameCallback(onFrame);
           };
           v.requestVideoFrameCallback(onFrame);
-          v.play().catch(()=>{ /* ignore background pause */ });
+          v.play().catch(()=>{});
         });
       } else {
         const totalFrames = Math.max(1, Math.floor(dur * this.fps));
@@ -505,12 +463,10 @@ $('start').onclick = async () => {
   if(state.running) return;
   const name = $('proj').value.trim() || ('Project ' + (hist.length+1));
   const kw = $('kw').value.trim();
-  const src = $('source').value, orient = $('orient').value, mode = $('outMode').value;
+  const orient = $('orient').value, mode = $('outMode').value;
   const q = +$('quality').value, targetSec = $('dur').value*60, maxClip = +$('clip').value;
   if(!kw){ log('Pehle keyword likho.','e'); $('kw').focus(); return; }
-  if((src!=='pixabay' && !getKey('pex')) || (src!=='pexels' && !getKey('pix'))){
-    log('API key missing.','e'); $('keys').open = true; return;
-  }
+  if(!getKey()){ log('Pixabay API key missing.','e'); $('keys').open = true; return; }
 
   state.running = true; state.paused = false; state.stop = false;
   $('start').disabled = true; $('ctrls').classList.add('on'); $('result').innerHTML = '';
@@ -523,7 +479,7 @@ $('start').onclick = async () => {
     try{ wl = await navigator.wakeLock.request('screen'); }catch(e){}
     log(`Queued: ${name}`);
 
-    const {clips, sum} = await gather(kw, src, orient, targetSec, maxClip, q);
+    const {clips, sum} = await gather(kw, orient, targetSec, maxClip, q);
     if(!clips.length){ log('Koi clip nahi mili.','e'); h.status='failed'; h.note='No clips'; }
     else {
       log(`${clips.length} clips mili (~${Math.round(sum/60*10)/10} min).`);
@@ -535,12 +491,12 @@ $('start').onclick = async () => {
       let merger = null;
       if(canMerge){
         const {W,H} = dims(q, orient);
-        const bps = {2160:30e6,1080:10e6,720:6e6,480:3e6}[q] || 10e6;
+        const bps = {2160:30e6,1080:10e6,720:6e6,480:3e6}[q] || 6e6;
         merger = new CodecsMerger(W, H, 30, bps);
         log(`Merge engine: WebCodecs ${W}x${H} @ 30fps — background-safe ✅`);
       }
 
-      // ===== FAST: prefetch next clips in parallel =====
+      // FAST: prefetch
       const PREFETCH = 5;
       const pending = new Map();
       const startFetch = i => {
@@ -607,7 +563,7 @@ $('start').onclick = async () => {
 };
 
 refreshPills();
-if(getKey('pex') || getKey('pix')) testKeys();
+if(getKey()) testKey();
 if(!HAS_CODECS){
   log('⚠ Is browser me WebCodecs nahi. Chrome/Edge desktop use karo.','w');
 }
