@@ -61,7 +61,6 @@
   .res button{margin-top:10px}
   details#keys{margin:0 0 6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
   details#keys summary{color:var(--txt);font-weight:600}
-  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:99px;background:#1c1c2e;color:var(--acc2);margin-left:6px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -167,15 +166,14 @@
 
 <footer>
   Videos <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a> aur
-  <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> ke hain, unke apne free licenses ke tahat.
-  Merge ab WebCodecs (frame-by-frame) se hota hai — tab background me jaane par bhi chalta rehta hai. Final video me audio nahi hoti.
-  "Non-copyright" ka matlab "koi claim nahi" nahi hota, YouTube upload se pehle license check kar lo.
+  <a href="https://pixabay.com" target="_blank" rel="noopener">Pixabay</a> ke hain.
+  Merge WebCodecs (frame-by-frame) se hota hai — tab background me bhi chalta rehta hai.
+  Final video me audio nahi hoti.
 </footer>
 
 <script type="module">
 /* =========================================================
-   Anas Stock Footages — WebCodecs merge (background-safe)
-   Engine: WebCodecs VideoEncoder + mp4-muxer (CDN)
+   Anas Stock Footages — WebCodecs (background-safe) + Fast
    ========================================================= */
 
 import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@5/+esm';
@@ -192,7 +190,6 @@ const fmtMB = b => b>=1073741824 ? (b/1073741824).toFixed(2)+' GB' : (b/1048576)
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const state = {running:false, paused:false, stop:false};
 
-/* ---------- engine check ---------- */
 const HAS_CODECS = typeof window.VideoEncoder !== 'undefined' && typeof window.VideoFrame !== 'undefined';
 $('sMode').textContent = HAS_CODECS ? 'WebCodecs' : 'Clips only';
 
@@ -209,16 +206,16 @@ async function testKeys(){
   if(getKey('pex')){
     try{
       const r = await fetch('https://api.pexels.com/videos/search?query=nature&per_page=1',{headers:{Authorization:getKey('pex')}});
-      if(r.ok){ setPill('pillPex',true,'🟢 Pexels connected'); const rem=r.headers.get('X-Ratelimit-Remaining'); if(rem) log('Pexels requests bachi: '+rem); }
+      if(r.ok) setPill('pillPex',true,'🟢 Pexels connected');
       else setPill('pillPex',false,'❌ Pexels key galat ('+r.status+')');
-    }catch(e){ setPill('pillPex',false,'❌ Pexels connect nahi hua (net/CORS)'); }
+    }catch(e){ setPill('pillPex',false,'❌ Pexels connect nahi hua'); }
   }
   if(getKey('pix')){
     try{
       const r = await fetch('https://pixabay.com/api/videos/?key='+encodeURIComponent(getKey('pix'))+'&q=nature&per_page=3');
       if(r.ok) setPill('pillPix',true,'🟢 Pixabay connected');
       else setPill('pillPix',false,'❌ Pixabay key galat ('+r.status+')');
-    }catch(e){ setPill('pillPix',false,'❌ Pixabay connect nahi hua (net/CORS)'); }
+    }catch(e){ setPill('pillPix',false,'❌ Pixabay connect nahi hua'); }
   }
 }
 $('saveKeys').onclick = () => {
@@ -266,7 +263,7 @@ function renderHist(){
   $('list').innerHTML = hist.length ? hist.map(h=>`
     <div class="proj">
       <div class="h"><span>${esc(h.name)}</span><span class="tag ${h.status==='running'?'run':(h.status==='completed'?'':'bad')}">${esc(h.status)}</span></div>
-      <div class="m">🔎 ${esc(h.kw)} · 🎞 ${h.clips} clips · ⏱ ${Math.round(h.secs/60*10)/10} min · 🖼 ${esc(h.quality)}p · 💾 ${fmtMB(h.bytes||0)} · ${esc(h.when)}</div>
+      <div class="m">🔎 ${esc(h.kw)} · 🎞 ${h.clips} clips · ⏱ ${Math.round(h.secs/60*10)/10} min · 💾 ${fmtMB(h.bytes||0)} · ${esc(h.when)}</div>
       ${h.note?`<div class="m">${esc(h.note)}</div>`:''}
     </div>`).join('') : '<div class="empty">Abhi koi project nahi. Left side se Start dabao.</div>';
 }
@@ -319,45 +316,24 @@ async function pixabayPage(kw, page, orient, maxClip, q){
   }
   return {items:out, more: (page*100) < (d.totalHits||0)};
 }
-async function retry(fn, label){
-  for(let a=0; a<4; a++){
-    try{ return await fn(); }
-    catch(e){
-      if(e.rate && label==='Pexels') throw new Error('Pexels limit khatam. Pixabay use karo ya 1 ghante baad.');
-      if(e.rate && a<3 && !state.stop){
-        log(`${label} rate limit. 60s wait...`,'w');
-        for(let s=0; s<60 && !state.stop; s++) await sleep(1000);
-        continue;
-      }
-      throw e;
-    }
-  }
-}
 
 /* ---------- FAST gather: parallel pages ---------- */
 async function gather(kw, src, orient, targetSec, maxClip, q){
   const seen = new Set(), clips = []; let sum = 0;
   const noRep = $('noRepeat').checked;
   const MAX_PAGE = 10;
-
-  // Parallel: saare pages ek saath
   const tasks = [];
   for(let p=1; p<=MAX_PAGE; p++){
     if(src!=='pixabay') tasks.push(
-      retry(()=>pexelsPage(kw,p,orient,maxClip,q),'Pexels')
-        .then(r=>({page:p, items:r.items}))
-        .catch(e=>({page:p, items:[], err:e.message}))
+      pexelsPage(kw,p,orient,maxClip,q).then(r=>({page:p, items:r.items})).catch(e=>({page:p, items:[], err:e.message}))
     );
     if(src!=='pexels') tasks.push(
-      retry(()=>pixabayPage(kw,p,orient,maxClip,q),'Pixabay')
-        .then(r=>({page:p, items:r.items}))
-        .catch(e=>({page:p, items:[], err:e.message}))
+      pixabayPage(kw,p,orient,maxClip,q).then(r=>({page:p, items:r.items})).catch(e=>({page:p, items:[], err:e.message}))
     );
   }
-  log(`Parallel search: ${tasks.length} requests bheji...`);
+  log(`Parallel search: ${tasks.length} requests...`);
   const results = await Promise.all(tasks);
   results.sort((a,b)=>a.page-b.page);
-
   for(const r of results){
     if(r.err) log(`Page ${r.page} err: ${r.err}`,'e');
     for(const c of r.items){
@@ -370,39 +346,31 @@ async function gather(kw, src, orient, targetSec, maxClip, q){
   return {clips, sum};
 }
 
-/* ---------- download helpers ---------- */
+/* ---------- helpers ---------- */
 const safe = s => String(s).replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_') || 'project';
 async function waitPause(){ while(state.paused && !state.stop) await sleep(300); }
 async function fetchBlob(c){
   let err = '';
-  for(let t=0;t<2;t++){
+  for(let t=0;t<3;t++){
     try{
       const res = await fetch(c.file.url);
       if(!res.ok) throw new Error('HTTP '+res.status);
       return {blob: await res.blob()};
     }catch(e){
-      err = (e instanceof TypeError) ? 'network/CORS block' : e.message;
-      await sleep(500);
+      err = (e instanceof TypeError) ? 'network/CORS' : e.message;
+      await sleep(400);
     }
   }
   return {blob:null, err};
 }
 
 /* =========================================================
-   WebCodecs MERGER — background-safe (frame-by-frame)
+   WebCodecs MERGER — background-safe
    ========================================================= */
 function dims(q, orient){
   const L = {2160:3840,1080:1920,720:1280,480:854}[q] || 1920;
   const S = {2160:2160,1080:1080,720:720,480:480}[q] || 1080;
   return orient==='portrait' ? {W:S,H:L} : {W:L,H:S};
-}
-
-async function seekTo(v, t){
-  return new Promise((res, rej)=>{
-    const onSeek = ()=>{ v.removeEventListener('seeked', onSeek); res(); };
-    v.addEventListener('seeked', onSeek);
-    try{ v.currentTime = t; }catch(e){ rej(e); }
-  });
 }
 
 class CodecsMerger {
@@ -424,12 +392,11 @@ class CodecsMerger {
       width: W, height: H,
       bitrate: bps,
       framerate: fps,
-      latencyMode: 'quality'
+      latencyMode: 'realtime'   // ✅ FAST
     });
-    this.timestamp = 0; // microseconds
+    this.timestamp = 0;
     this.frameDur = Math.round(1e6 / fps);
     this.encoded = 0;
-    this.onProgress = null;
   }
 
   async addClip(blob, targetDur){
@@ -451,19 +418,18 @@ class CodecsMerger {
       const dx = (this.W-dw)/2, dy = (this.H-dh)/2;
 
       const dur = Math.min(v.duration || 0, targetDur || v.duration || 0);
-      const totalFrames = Math.max(1, Math.floor(dur * this.fps));
 
-      // fast path: play() + requestVideoFrameCallback agar available
       if('requestVideoFrameCallback' in v){
         await new Promise((res, rej)=>{
           let stopped = false;
           const cleanup = ()=>{ stopped = true; try{ v.pause(); }catch(e){} };
           v.onended = ()=>res();
 
-          const onFrame = (now, meta) => {
+          const onFrame = () => {
             if(stopped) return;
             if(state.stop){ cleanup(); return res(); }
             if(state.paused){ setTimeout(()=>v.requestVideoFrameCallback(onFrame), 200); return; }
+            if(v.currentTime > dur){ cleanup(); return res(); }
 
             this.ctx.fillStyle = '#000';
             this.ctx.fillRect(0,0,this.W,this.H);
@@ -476,34 +442,28 @@ class CodecsMerger {
               frame.close();
               this.timestamp += this.frameDur;
               this.encoded++;
-              if(this.onProgress) this.onProgress(this.encoded);
-            }catch(e){ /* skip frame */ }
+            }catch(e){}
 
             v.requestVideoFrameCallback(onFrame);
           };
           v.requestVideoFrameCallback(onFrame);
-          v.play().catch(rej);
-          // safety: agar kuch ghalat ho to 60s me nikal jao
-          setTimeout(()=>{ if(!stopped) { cleanup(); res(); } }, 60000);
+          v.play().catch(()=>{ /* ignore background pause */ });
         });
       } else {
-        // fallback: seek-based (slow but works)
+        const totalFrames = Math.max(1, Math.floor(dur * this.fps));
         for(let i=0; i<totalFrames; i++){
           if(state.stop) break;
           await waitPause();
-          const t = i / this.fps;
-          if(t >= dur) break;
-          await seekTo(v, t);
+          v.currentTime = i / this.fps;
+          await new Promise(r=>{ v.onseeked = r; });
           this.ctx.fillStyle = '#000';
           this.ctx.fillRect(0,0,this.W,this.H);
           this.ctx.drawImage(v, dx, dy, dw, dh);
           const frame = new VideoFrame(this.canvas, { timestamp: this.timestamp });
-          const keyFrame = (i === 0);
-          this.encoder.encode(frame, { keyFrame });
+          this.encoder.encode(frame, { keyFrame: i===0 });
           frame.close();
           this.timestamp += this.frameDur;
           this.encoded++;
-          if(this.onProgress) this.onProgress(this.encoded);
         }
       }
     } finally {
@@ -522,7 +482,6 @@ class CodecsMerger {
   }
 }
 
-/* ---------- result UI ---------- */
 function showResult(blob, fname){
   $('result').innerHTML = `<div class="res"><div>🎬 <b>${esc(fname)}</b> · ${fmtMB(blob.size)}</div><button class="primary" id="dlM">⬇ Download merged video</button></div>`;
   $('dlM').onclick = () => {
@@ -568,48 +527,52 @@ $('start').onclick = async () => {
     if(!clips.length){ log('Koi clip nahi mili.','e'); h.status='failed'; h.note='No clips'; }
     else {
       log(`${clips.length} clips mili (~${Math.round(sum/60*10)/10} min).`);
-
-      const doMerge = mode !== 'clips';
-      if(doMerge && !HAS_CODECS){
-        log('Is browser me WebCodecs nahi (Chrome/Edge desktop use karo). Sirf clips download hongi.','e');
+      const canMerge = (mode !== 'clips') && HAS_CODECS;
+      if(mode !== 'clips' && !HAS_CODECS){
+        log('⚠ Browser me WebCodecs nahi. Chrome/Edge desktop use karo. Sirf clips download hongi.','w');
       }
-      const canMerge = doMerge && HAS_CODECS;
 
       let merger = null;
       if(canMerge){
         const {W,H} = dims(q, orient);
         const bps = {2160:30e6,1080:10e6,720:6e6,480:3e6}[q] || 10e6;
         merger = new CodecsMerger(W, H, 30, bps);
-        log(`Merge engine: WebCodecs ${W}x${H} @ 30fps (background-safe)`);
+        log(`Merge engine: WebCodecs ${W}x${H} @ 30fps — background-safe ✅`);
       }
 
-      // Save all blobs so we can both merge and save clips
-      const blobs = [];
-      let ok = 0, fail = 0;
+      // ===== FAST: prefetch next clips in parallel =====
+      const PREFETCH = 5;
+      const pending = new Map();
+      const startFetch = i => {
+        if(i>=clips.length || pending.has(i)) return;
+        pending.set(i, fetchBlob(clips[i]));
+      };
+      for(let i=0;i<PREFETCH;i++) startFetch(i);
 
+      let ok = 0, fail = 0;
       for(let i=0;i<clips.length;i++){
         await waitPause();
         if(state.stop) break;
         const c = clips[i];
-        const got = await fetchBlob(c);
+        const got = await pending.get(i);
+        pending.delete(i);
+        startFetch(i + PREFETCH);
+
         if(!got.blob){ fail++; log(`Clip ${i+1} fail: ${got.err}`,'e'); continue; }
 
-        // Save clip file if user wants
         if(mode === 'both' || mode === 'clips'){
           const fname = `${safe(name)}_${String(i+1).padStart(3,'0')}_${c.id}_${c.file.k}p.mp4`;
           const a = document.createElement('a');
           a.href = URL.createObjectURL(got.blob); a.download = fname;
           document.body.appendChild(a); a.click(); a.remove();
           setTimeout(()=>URL.revokeObjectURL(a.href), 8000);
-          await sleep(400);
+          await sleep(300);
           h.bytes += got.blob.size;
         }
 
         if(canMerge){
-          try{
-            log(`Encoding clip ${i+1}/${clips.length}...`);
-            await merger.addClip(got.blob, c.dur);
-          }catch(e){ log(`Merge fail clip ${i+1}: ${e.message}`,'e'); fail++; continue; }
+          try{ await merger.addClip(got.blob, c.dur); }
+          catch(e){ log(`Merge fail clip ${i+1}: ${e.message}`,'e'); fail++; continue; }
         }
 
         ok++; h.clips++; h.secs += c.dur; seenIds.add(c.id);
@@ -625,7 +588,7 @@ $('start').onclick = async () => {
         const fname = `${safe(name)}_MERGED.mp4`;
         h.bytes += blob.size; h.note = `Merged: ${fname}`;
         showResult(blob, fname);
-        log(`✅ Merged video ready: ${fname} (${fmtMB(blob.size)})`);
+        log(`✅ Ready: ${fname} (${fmtMB(blob.size)})`);
       }
 
       h.status = state.stop ? 'stopped' : (fail && !ok ? 'failed' : 'completed');
@@ -643,11 +606,10 @@ $('start').onclick = async () => {
   }
 };
 
-/* ---------- init ---------- */
 refreshPills();
 if(getKey('pex') || getKey('pix')) testKeys();
 if(!HAS_CODECS){
-  log('⚠ Is browser me WebCodecs nahi hai. Chrome/Edge desktop use karo merge ke liye. Filhaal "Sirf alag clips" mode chalega.','w');
+  log('⚠ Is browser me WebCodecs nahi. Chrome/Edge desktop use karo.','w');
 }
 </script>
 </body>
